@@ -5,14 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { CreateProjectDialog } from "@/components/project/create-project-dialog";
+import { toast } from "sonner";
 
 interface Project {
   id: string;
   name: string;
-  domain: string;
+  domain: string | null;
   is_deployed: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export default function Dashboard() {
@@ -27,23 +29,37 @@ export default function Dashboard() {
 
   const fetchProjects = async () => {
     try {
+      // Get the current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error("You must be logged in to view projects");
+      }
+
+      // Fetch projects for the current user
       const { data, error } = await supabase
         .from('projects')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setProjects(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching projects:', error);
+      toast.error(error.message || "Failed to fetch projects");
     } finally {
       setLoading(false);
     }
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
+    try {
+      await supabase.auth.signOut();
+      router.push('/');
+    } catch (error: any) {
+      toast.error("Failed to sign out");
+    }
   };
 
   return (
@@ -58,10 +74,7 @@ export default function Dashboard() {
       <main className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-3xl font-bold">Your Projects</h2>
-          <Button onClick={() => router.push('/dashboard/new-project')}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Project
-          </Button>
+          <CreateProjectDialog />
         </div>
 
         {loading ? (
@@ -87,10 +100,7 @@ export default function Dashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={() => router.push('/dashboard/new-project')}>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Project
-              </Button>
+              <CreateProjectDialog />
             </CardContent>
           </Card>
         ) : (
@@ -100,7 +110,7 @@ export default function Dashboard() {
                     onClick={() => router.push(`/dashboard/projects/${project.id}`)}>
                 <CardHeader>
                   <CardTitle>{project.name}</CardTitle>
-                  <CardDescription>{project.domain}</CardDescription>
+                  <CardDescription>{project.domain || "No domain set"}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center">
