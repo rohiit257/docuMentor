@@ -7,6 +7,8 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
 import { CreateProjectDialog } from "@/components/project/create-project-dialog";
 import { toast } from "sonner";
+import { Loader2, Trash } from "lucide-react"; // Import the Trash icon
+import Navbar from "../../components/Navbar"; // Import the Navbar component
 
 interface Project {
   id: string;
@@ -20,6 +22,7 @@ interface Project {
 export default function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null); // Track the project being deleted
   const router = useRouter();
   const supabase = createClientComponentClient();
 
@@ -29,27 +32,47 @@ export default function Dashboard() {
 
   const fetchProjects = async () => {
     try {
-      // Get the current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
       if (userError || !user) {
         throw new Error("You must be logged in to view projects");
       }
 
-      // Fetch projects for the current user
       const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .from("projects")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       setProjects(data || []);
     } catch (error: any) {
-      console.error('Error fetching projects:', error);
+      console.error("Error fetching projects:", error);
       toast.error(error.message || "Failed to fetch projects");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    if (!confirm("Are you sure you want to delete this project?")) return;
+
+    try {
+      setDeleting(projectId);
+
+      const { error } = await supabase
+        .from("projects")
+        .delete()
+        .eq("id", projectId);
+
+      if (error) throw error;
+
+      toast.success("Project deleted successfully!");
+      setProjects((prev) => prev.filter((project) => project.id !== projectId));
+    } catch (error: any) {
+      console.error("Error deleting project:", error);
+      toast.error(error.message || "Failed to delete project");
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -64,12 +87,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">API Docs Generator</h1>
-          <Button variant="outline" onClick={handleSignOut}>Sign Out</Button>
-        </div>
-      </header>
+      <Navbar /> {/* Use the Navbar component here */}
 
       <main className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
@@ -106,19 +124,39 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => (
-              <Card key={project.id} className="cursor-pointer hover:shadow-lg transition-shadow"
-                    onClick={() => router.push(`/dashboard/projects/${project.id}`)}>
+              <Card key={project.id} className="cursor-pointer hover:shadow-lg transition-shadow">
                 <CardHeader>
-                  <CardTitle>{project.name}</CardTitle>
-                  <CardDescription>{project.domain || "No domain set"}</CardDescription>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>{project.name}</CardTitle>
+                      <CardDescription>{project.domain || "No domain set"}</CardDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent card click navigation
+                        handleDeleteProject(project.id);
+                      }}
+                      disabled={deleting === project.id}
+                    >
+                      {deleting === project.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash className="h-4 w-4 text-red-500" />
+                      )}
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center">
-                    <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
-                      project.is_deployed ? 'bg-green-500' : 'bg-yellow-500'
-                    }`}></span>
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full mr-2 ${
+                        project.is_deployed ? "bg-green-500" : "bg-yellow-500"
+                      }`}
+                    ></span>
                     <span className="text-sm text-muted-foreground">
-                      {project.is_deployed ? 'Deployed' : 'Not Deployed'}
+                      {project.is_deployed ? "Deployed" : "Not Deployed"}
                     </span>
                   </div>
                 </CardContent>

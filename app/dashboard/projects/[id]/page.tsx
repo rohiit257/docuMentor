@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { generateDocumentation } from "@/lib/services/ai";
 import ReactMarkdown from "react-markdown"; // Install this library if not already installed
 import remarkGfm from "remark-gfm"; // For GitHub-flavored Markdown (optional)
+import Navbar from "@/components/Navbar";
 
 interface Project {
   id: string;
@@ -134,6 +135,7 @@ export default function ProjectPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <Navbar/>
       <div className="mb-8">
         <h1 className="text-3xl font-bold">{project.name}</h1>
         <p className="text-muted-foreground">{project.domain || "No domain set"}</p>
